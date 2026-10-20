@@ -353,6 +353,8 @@ func ociErrorToAISError(op, bucketName, objectPath, byteRange string, errIn erro
 		statusCode, ok = respOrStatus.(int)
 		if !ok {
 			switch resp := respOrStatus.(type) {
+			case *http.Response:
+				rawResponse = resp
 			case ocios.AbortMultipartUploadResponse:
 				rawResponse = resp.RawResponse
 			case ocios.CommitMultipartUploadResponse:
@@ -666,6 +668,11 @@ func (bp *ocibp) PutObj(ctx context.Context, r io.ReadCloser, lom *core.LOM, ore
 		objectAttrs = lom.ObjAttrs()
 		objectSize  int64
 	)
+	ifMatch, ifNoneMatch, err := ociWriteConditions(oreq)
+	if err != nil {
+		_ = r.Close()
+		return http.StatusBadRequest, err
+	}
 	client, _, err := bp.ociClient(cloudBck)
 	if err != nil {
 		return ociClientToAISError("PutObject", cloudBck.Name, lom.ObjName, err)
@@ -680,7 +687,7 @@ func (bp *ocibp) PutObj(ctx context.Context, r io.ReadCloser, lom *core.LOM, ore
 
 	ociSetMetadata(lom.ObjAttrs(), ociPutMetadata(lom, oreq), ociPutContentType(lom, oreq))
 	if !avoidingMPU {
-		return bp.putObjViaMPU(r, lom, objectSize, oreq)
+		return bp.putObjViaMPU(r, lom, objectSize, oreq, ifMatch, ifNoneMatch)
 	}
 
 	req := ocios.PutObjectRequest{
@@ -688,6 +695,8 @@ func (bp *ocibp) PutObj(ctx context.Context, r io.ReadCloser, lom *core.LOM, ore
 		BucketName:    &cloudBck.Name,
 		ObjectName:    &lom.ObjName,
 		PutObjectBody: r,
+		IfMatch:       ifMatch,
+		IfNoneMatch:   ifNoneMatch,
 		OpcMeta:       ociPutMetadata(lom, oreq),
 		ContentType:   ociPutContentType(lom, oreq),
 	}

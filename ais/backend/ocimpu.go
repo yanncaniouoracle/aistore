@@ -66,7 +66,7 @@ type ociMPUStruct struct {
 // Finally, if there are no errors, putObjViaMPU() can perform the MPU "complete"
 // operation that logically combines all those uploaded parts. If there were errors,
 // the MPU operation is aborted.
-func (bp *ocibp) putObjViaMPU(r io.ReadCloser, lom *core.LOM, objectSize int64, oreq *http.Request) (int, error) {
+func (bp *ocibp) putObjViaMPU(r io.ReadCloser, lom *core.LOM, objectSize int64, oreq *http.Request, ifMatch, ifNoneMatch *string) (int, error) {
 	var (
 		cloudBck   = lom.Bck().RemoteBck()
 		err        error
@@ -141,6 +141,8 @@ func (bp *ocibp) putObjViaMPU(r io.ReadCloser, lom *core.LOM, objectSize int64, 
 		BucketName:    &mpu.bucketName,
 		ObjectName:    &mpu.objectName,
 		UploadId:      &mpu.uploadID,
+		IfMatch:       ifMatch,
+		IfNoneMatch:   ifNoneMatch,
 		CommitMultipartUploadDetails: ocios.CommitMultipartUploadDetails{
 			PartsToCommit: make([]ocios.CommitMultipartUploadPartDetails, 0, mpu.nextPartNum),
 		},

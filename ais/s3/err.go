@@ -133,6 +133,8 @@ func WriteErr(w http.ResponseWriter, r *http.Request, errInfo ErrInfo) {
 		}
 	case isErrNoSuchUpload(err):
 		out.Code = NoSuchUpload
+	case in.Status == http.StatusPreconditionFailed:
+		out.Code = "PreconditionFailed"
 	case in.TypeCode != "":
 		out.Code = in.TypeCode
 	default:
