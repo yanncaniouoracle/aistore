@@ -705,7 +705,7 @@ func (bp *ocibp) PutObj(ctx context.Context, r io.ReadCloser, lom *core.LOM, ore
 	// Note: in case PutObject() failed to close r...
 	_ = r.Close()
 	if err != nil {
-		return ociErrorToAISError("PutObject", cloudBck.Name, lom.ObjName, "", err, resp)
+		return ociWriteError("PutObject", cloudBck.Name, lom.ObjName, err, resp, ifMatch, ifNoneMatch)
 	}
 
 	h := cmn.BackendHelpers.OCI

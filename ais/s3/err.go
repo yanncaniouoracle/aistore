@@ -114,6 +114,10 @@ func WriteErr(w http.ResponseWriter, r *http.Request, errInfo ErrInfo) {
 	if in, ok = err.(*cmn.ErrHTTP); !ok {
 		in = cmn.InitErrHTTP(r, err, errInfo.Status)
 		allocated = true
+		if wrapped := cmn.AsErrHTTP(err); wrapped != nil {
+			// Keep the wrapper's message (including multipart hints) and the wire error's identity.
+			in.TypeCode, in.Status = wrapped.TypeCode, wrapped.Status
+		}
 	}
 	out.Message = in.Message
 	switch {

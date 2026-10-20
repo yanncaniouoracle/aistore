@@ -167,7 +167,7 @@ func (bp *ocibp) CompleteMpt(ctx context.Context, lom *core.LOM, oreq *http.Requ
 	if err == nil {
 		etag = *commitMultipartUploadResponse.ETag
 	} else {
-		ecode, err = ociErrorToAISError(fmt.Sprintf("CommitMultipartUpload(%s)", uploadID), cloudBck.Name, lom.ObjName, "", err, commitMultipartUploadResponse.RawResponse)
+		ecode, err = ociWriteError(fmt.Sprintf("CommitMultipartUpload(%s)", uploadID), cloudBck.Name, lom.ObjName, err, commitMultipartUploadResponse.RawResponse, ifMatch, ifNoneMatch)
 	}
 
 	return "", etag, ecode, err

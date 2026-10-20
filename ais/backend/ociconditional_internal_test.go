@@ -1,5 +1,7 @@
 //go:build oci
 
+// Package backend contains core/backend interface implementations for supported backend providers.
+// no-copyright
 package backend
 
 import (
@@ -7,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -16,6 +19,7 @@ import (
 	"github.com/NVIDIA/aistore/cmn/cos"
 	"github.com/NVIDIA/aistore/core"
 	"github.com/NVIDIA/aistore/core/meta"
+
 	ocios "github.com/oracle/oci-go-sdk/v65/objectstorage"
 )
 
@@ -66,7 +70,7 @@ func conditionalLOM() *core.LOM {
 	return lom
 }
 func conditionalRequest(header, value string) *http.Request {
-	r, _ := http.NewRequest(http.MethodPut, "http://ais.invalid/s3/bucket/manifest", nil)
+	r, _ := http.NewRequest(http.MethodPut, "http://ais.invalid/s3/bucket/manifest", http.NoBody)
 	if header != "" {
 		r.Header.Set(header, value)
 	}
@@ -107,7 +111,7 @@ func TestOCIConditionalConcurrentCreate(t *testing.T) {
 	for i := range 16 {
 		go func() {
 			<-start
-			code, err := bp.PutObj(context.Background(), io.NopCloser(strings.NewReader(fmt.Sprint(i))), conditionalLOM(), conditionalRequest("If-None-Match", "*"))
+			code, err := bp.PutObj(context.Background(), io.NopCloser(strings.NewReader(strconv.Itoa(i))), conditionalLOM(), conditionalRequest("If-None-Match", "*"))
 			if code == 0 && err != nil {
 				code = 500
 			}

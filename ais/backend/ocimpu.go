@@ -13,6 +13,9 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"time"
+
+	"github.com/NVIDIA/aistore/cmn/nlog"
 
 	"github.com/NVIDIA/aistore/api/apc"
 	"github.com/NVIDIA/aistore/cmn"
@@ -113,6 +116,21 @@ func (bp *ocibp) putObjViaMPU(r io.ReadCloser, lom *core.LOM, objectSize int64, 
 	}
 
 	mpu.uploadID = *createResp.MultipartUpload.UploadId
+	committed := false
+	defer func() {
+		if committed {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		_, abortErr := mpu.client.AbortMultipartUpload(ctx, ocios.AbortMultipartUploadRequest{
+			NamespaceName: &bp.namespace, BucketName: &mpu.bucketName,
+			ObjectName: &mpu.objectName, UploadId: &mpu.uploadID,
+		})
+		if abortErr != nil {
+			nlog.Warningln("failed to abort OCI multipart upload", mpu.uploadID, abortErr)
+		}
+	}()
 
 	mpu.Lock()
 	mpu.Add(1)
@@ -121,17 +139,6 @@ func (bp *ocibp) putObjViaMPU(r io.ReadCloser, lom *core.LOM, objectSize int64, 
 	mpu.Wait()
 
 	if len(mpu.err) > 0 {
-		abortReq := ocios.AbortMultipartUploadRequest{
-			NamespaceName: &mpu.bp.namespace,
-			BucketName:    &mpu.bucketName,
-			ObjectName:    &mpu.objectName,
-			UploadId:      &mpu.uploadID,
-		}
-
-		// Note: We are ignoring the Status returned by the Abort...() call as this is
-		//       just trying to clean up for some prior error we are already handling.
-		_, _ = mpu.client.AbortMultipartUpload(context.Background(), abortReq)
-
 		err = fmt.Errorf("%v of %v part uploads failed", len(mpu.err), totalParts)
 		return ociErrorToAISError("UploadPart", mpu.bucketName, mpu.objectName, "", err, nil)
 	}
@@ -159,9 +166,10 @@ func (bp *ocibp) putObjViaMPU(r io.ReadCloser, lom *core.LOM, objectSize int64, 
 
 	commitResp, err := mpu.client.CommitMultipartUpload(context.Background(), commitReq)
 	if err != nil {
-		return ociErrorToAISError("CommitMultipartUpload", mpu.bucketName, mpu.objectName, "", err, commitResp)
+		return ociWriteError("CommitMultipartUpload", mpu.bucketName, mpu.objectName, err, commitResp, ifMatch, ifNoneMatch)
 	}
 
+	committed = true
 	h := cmn.BackendHelpers.OCI
 
 	lom.SetCustomKey(apc.HdrBackendProvider, apc.OCI)
